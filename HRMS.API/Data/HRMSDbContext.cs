@@ -9,10 +9,6 @@ namespace HRMS.API.Data
         {
         }
 
-        protected HRMSDbContext()
-        {
-        }
-
         public DbSet<Department> Departments { get; set; }
         public DbSet<Employee> Employees { get; set; }
     }
