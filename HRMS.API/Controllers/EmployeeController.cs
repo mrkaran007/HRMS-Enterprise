@@ -43,10 +43,15 @@ namespace HRMS.API.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateEmployee(CreateEmployeeDto employeeDto)
         {
-            var DepartmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
-            if (!DepartmentExists)
+            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+            if (!departmentExists)
             {
                 return BadRequest("Department not found");
+            }
+
+            if (employeeDto.JoiningDate.Date > DateTime.Today)
+            {
+                return BadRequest("Joining date cannot be in the future.");
             }
 
             var employee = new Employee
@@ -66,13 +71,25 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateEmployee(int id, CreateEmployeeDto employeeDto)
+        public async Task<IActionResult> UpdateEmployee(int id, UpdateEmployeeDto employeeDto)
         {
             var employee = await _context.Employees.FindAsync(id);
             if (employee == null)
             {
                 return NotFound();
             }
+
+            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+            if (!departmentExists)
+            {
+                return BadRequest("Department not found");
+            }
+
+            if (employeeDto.JoiningDate.Date > DateTime.Today)
+            {
+                return BadRequest("Joining date cannot be in the future.");
+            }
+
             employee.FirstName = employeeDto.FirstName;
             employee.LastName = employeeDto.LastName;
             employee.Email = employeeDto.Email;
@@ -80,6 +97,7 @@ namespace HRMS.API.Controllers
             employee.Salary = employeeDto.Salary;
             employee.JoiningDate = employeeDto.JoiningDate;
             employee.DepartmentId = employeeDto.DepartmentId;
+
             await _context.SaveChangesAsync();
             return Ok(employee);
         }

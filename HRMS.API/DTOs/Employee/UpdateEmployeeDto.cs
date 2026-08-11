@@ -2,7 +2,7 @@
 
 namespace HRMS.API.DTOs.Employee
 {
-    public class CreateEmployeeDto
+    public class UpdateEmployeeDto
     {
         [Required]
         [StringLength(50, MinimumLength = 2)]

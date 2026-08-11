@@ -52,7 +52,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateDepartment(int id, CreateDepartmentDto departmentDto)
+        public async Task<IActionResult> UpdateDepartment(int id, UpdateDepartmentDto departmentDto)
         {
             var department = await _context.Departments.FindAsync(id);
             if (department == null)

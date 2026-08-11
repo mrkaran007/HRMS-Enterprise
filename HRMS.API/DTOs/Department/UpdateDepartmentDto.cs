@@ -2,7 +2,7 @@
 
 namespace HRMS.API.DTOs.Department
 {
-    public class CreateDepartmentDto
+    public class UpdateDepartmentDto
     {
         [Required]
         [StringLength(100, MinimumLength = 2)]
