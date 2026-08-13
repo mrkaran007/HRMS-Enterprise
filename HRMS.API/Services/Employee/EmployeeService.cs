@@ -14,28 +14,28 @@ namespace HRMS.API.Services.Employee
         }
 
         #region CreateEmployee
-        public async Task<Models.Employee> CreateEmployeeAsync(CreateEmployeeDto employee)
+        public async Task<Models.Employee> CreateEmployeeAsync(CreateEmployeeDto employeeDto)
         {
-            var isDepartmentExists = await _context.Departments.AnyAsync(d=> d.DepartmentId == employee.DepartmentId);
+            var departmentExists = await _context.Departments.AnyAsync(d=> d.DepartmentId == employeeDto.DepartmentId);
 
-            if (!isDepartmentExists) {
+            if (!departmentExists) {
                 throw new InvalidOperationException("Department not found");
             }
 
-            if (employee.JoiningDate.Date > DateTime)
+            if (employeeDto.JoiningDate.Date > DateTime.Today)
             {
-                
+                throw new InvalidOperationException("Joining date cannot be in the future");
             }
 
             var newEmployee = new Models.Employee
             {
-                FirstName = employee.FirstName,
-                LastName = employee.LastName,
-                Email = employee.Email,
-                Phone = employee.Phone,
-                Salary = employee.Salary,
-                JoiningDate = employee.JoiningDate,
-                DepartmentId = employee.DepartmentId
+                FirstName = employeeDto.FirstName,
+                LastName = employeeDto.LastName,
+                Email = employeeDto.Email,
+                Phone = employeeDto.Phone,
+                Salary = employeeDto.Salary,
+                JoiningDate = employeeDto.JoiningDate,
+                DepartmentId = employeeDto.DepartmentId
             };
             _context.Employees.Add(newEmployee);
             await _context.SaveChangesAsync();
@@ -46,7 +46,15 @@ namespace HRMS.API.Services.Employee
         #region DeleteEmployee
         public async Task<bool> DeleteEmployeeAsync(int employeeId)
         {
-            throw new NotImplementedException();
+            var existingEmployee = await _context.Employees.FindAsync(employeeId);
+            if (existingEmployee == null)
+            {
+                return false;
+            }
+
+            _context.Employees.Remove(existingEmployee);
+            await _context.SaveChangesAsync();
+            return true;
         }
         #endregion
 
@@ -65,9 +73,34 @@ namespace HRMS.API.Services.Employee
         #endregion
 
         #region UpdateEmployee
-        public async Task<Models.Employee?> UpdateEmployeeAsync(int id, UpdateEmployeeDto employee)
+        public async Task<Models.Employee?> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employeeDto)
         {
-            throw new NotImplementedException();
+            var existingEmployee = await _context.Employees.FindAsync(employeeId);
+            if (existingEmployee == null) {
+                return null;
+            }
+            if (employeeDto.JoiningDate.Date > DateTime.Today)
+            {
+                throw new InvalidOperationException("Joining date cannot be in the future");
+            }
+            var isDepartmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+            if (!isDepartmentExists)
+            {
+                throw new InvalidOperationException("Department not found");
+            }
+
+            // Update the properties of the existing employee with the new values
+            existingEmployee.FirstName = employeeDto.FirstName;
+            existingEmployee.LastName = employeeDto.LastName;
+            existingEmployee.Email = employeeDto.Email;
+            existingEmployee.Phone = employeeDto.Phone;
+            existingEmployee.Salary = employeeDto.Salary;
+            existingEmployee.JoiningDate = employeeDto.JoiningDate;
+            existingEmployee.DepartmentId = employeeDto.DepartmentId;
+            
+            
+            await _context.SaveChangesAsync();
+            return existingEmployee;
         }
         #endregion
 

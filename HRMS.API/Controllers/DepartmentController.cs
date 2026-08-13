@@ -1,8 +1,6 @@
-﻿using HRMS.API.Data;
-using HRMS.API.DTOs.Department;
-using HRMS.API.Models;
+﻿using HRMS.API.DTOs.Department;
+using HRMS.API.Services.Department;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API.Controllers
 {
@@ -10,72 +8,70 @@ namespace HRMS.API.Controllers
     [Route("api/[controller]")]
     public class DepartmentController : ControllerBase
     {
-        private readonly HRMSDbContext _context;
-
-        public DepartmentController(HRMSDbContext context)
+        private readonly IDepartmentService _departmentService;
+        public DepartmentController(IDepartmentService departmentService)
         {
-            _context = context;
+            _departmentService = departmentService;
         }
 
+        #region GetAllDepartments
         [HttpGet]
-        public async Task<IActionResult> GetDepartments()
+        public async Task<IActionResult> GetAllDepartments()
         {
             
-            var departments = await _context.Departments.ToListAsync();
+            var departments = await _departmentService.GetAllDepartmentsAsync();
 
             return Ok(departments);
         }
+        #endregion
 
+        #region GetDepartmentById
         [HttpGet("{id}")]
         public async Task<IActionResult> GetDepartmentById(int id)
         {
-            var department = await _context.Departments.FindAsync(id);
+            var department = await _departmentService.GetDepartmentByIdAsync(id);
             if (department == null)
             {
                 return NotFound();
             }
             return Ok(department);
         }
+        #endregion
 
+        #region CreateDepartment
         [HttpPost]
         public async Task<IActionResult> CreateDepartment(CreateDepartmentDto departmentDto)
         {
-            var department = new Department
-            {
-                DepartmentName = departmentDto.DepartmentName
-            };
-
-            _context.Departments.Add(department);
-            await _context.SaveChangesAsync();
-
+            var department = await _departmentService.CreateDepartmentAsync(departmentDto);
+            
             return CreatedAtAction(nameof(GetDepartmentById), new { id = department.DepartmentId }, department);
         }
+        #endregion
 
+        #region UpdateDepartment
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateDepartment(int id, UpdateDepartmentDto departmentDto)
         {
-            var department = await _context.Departments.FindAsync(id);
+            var department = await _departmentService.UpdateDepartmentAsync(id, departmentDto);
             if (department == null)
             {
                 return NotFound();
             }
-            department.DepartmentName = departmentDto.DepartmentName;
-            
-            await _context.SaveChangesAsync();
             return Ok(department);
         }
+        #endregion
 
+        #region DeleteDepartment
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
-            var department = await _context.Departments.FindAsync(id);
-            if (department == null)
+            var status = await _departmentService.DeleteDepartmentAsync(id);
+            if (!status)
             {
                 return NotFound();
             }
-            _context.Departments.Remove(department);
-            await _context.SaveChangesAsync();
             return NoContent();
         }
+        #endregion
     }
 }

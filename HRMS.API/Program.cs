@@ -1,5 +1,7 @@
 
 using HRMS.API.Data;
+using HRMS.API.Services.Department;
+using HRMS.API.Services.Employee;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API
@@ -18,6 +20,8 @@ namespace HRMS.API
                         builder.Configuration.GetConnectionString("DefaultConnection")
                         )
                 );
+            builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+            builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();

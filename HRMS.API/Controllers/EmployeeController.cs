@@ -1,8 +1,7 @@
-﻿using HRMS.API.Data;
-using HRMS.API.DTOs.Employee;
+﻿using HRMS.API.DTOs.Employee;
 using HRMS.API.Models;
+using HRMS.API.Services.Employee;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API.Controllers
 {
@@ -10,109 +9,74 @@ namespace HRMS.API.Controllers
     [Route("api/[controller]")]
     public class EmployeeController : ControllerBase
     {
-        private readonly HRMSDbContext _context;
+        private readonly IEmployeeService _employeeService;
 
-        public EmployeeController(HRMSDbContext context)
+        public EmployeeController(IEmployeeService employeeService)
         {
-            _context = context;
+            _employeeService = employeeService;
         }
 
+        #region GetAllEmployees
         [HttpGet]
-        public async Task<IActionResult> GetEmployees()
+        public async Task<IActionResult> GetAllEmployees()
         {
-            List<Employee> employees = await _context.Employees.ToListAsync();
-            //List<Employee> employees = await (from e in _context.Employees
-            //                           select e).ToListAsync();
+            List<Employee> employees = await _employeeService.GetAllEmployeesAsync();
             return Ok(employees);
         }
+        #endregion
 
+        #region GetEmployeeById
         [HttpGet("{id}")]
         public async Task<IActionResult> GetEmployeeById(int id)
         {
-            Employee? employee = await _context.Employees.FindAsync(id);
-            //Employee? employee = await( from e in _context.Employees
-            //                             where e.EmployeeId == id
-            //                             select e).FirstOrDefaultAsync();
+            Employee? employee = await _employeeService.GetEmployeeByIdAsync(id);
+            
             if (employee == null)
             {
                 return NotFound();
             }
             return Ok(employee);
         }
+        #endregion
 
+        #region CreateEmployee
         [HttpPost]
         public async Task<IActionResult> CreateEmployee(CreateEmployeeDto employeeDto)
         {
-            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
-            if (!departmentExists)
-            {
-                return BadRequest("Department not found");
-            }
-
-            if (employeeDto.JoiningDate.Date > DateTime.Today)
-            {
-                return BadRequest("Joining date cannot be in the future.");
-            }
-
-            var employee = new Employee
-            {
-                FirstName = employeeDto.FirstName,
-                LastName = employeeDto.LastName,
-                Email = employeeDto.Email,
-                Phone = employeeDto.Phone,
-                Salary = employeeDto.Salary,
-                JoiningDate = employeeDto.JoiningDate,
-                DepartmentId = employeeDto.DepartmentId
-            };
-
-            _context.Employees.Add(employee);
-            await _context.SaveChangesAsync();
+            var employee = await _employeeService.CreateEmployeeAsync(employeeDto);
+     
             return CreatedAtAction(nameof(GetEmployeeById), new { id = employee.EmployeeId }, employee);
         }
+        #endregion
 
+        #region UpdateEmployee
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateEmployee(int id, UpdateEmployeeDto employeeDto)
         {
-            var employee = await _context.Employees.FindAsync(id);
+            var employee = await _employeeService.UpdateEmployeeAsync(id, employeeDto);
+
             if (employee == null)
             {
                 return NotFound();
             }
 
-            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
-            if (!departmentExists)
-            {
-                return BadRequest("Department not found");
-            }
-
-            if (employeeDto.JoiningDate.Date > DateTime.Today)
-            {
-                return BadRequest("Joining date cannot be in the future.");
-            }
-
-            employee.FirstName = employeeDto.FirstName;
-            employee.LastName = employeeDto.LastName;
-            employee.Email = employeeDto.Email;
-            employee.Phone = employeeDto.Phone;
-            employee.Salary = employeeDto.Salary;
-            employee.JoiningDate = employeeDto.JoiningDate;
-            employee.DepartmentId = employeeDto.DepartmentId;
-
-            await _context.SaveChangesAsync();
             return Ok(employee);
         }
+        #endregion
 
+        #region DeleteEmployee
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEmployee(int id)
         {
-            var employee = await _context.Employees.FindAsync(id);
-            if (employee == null)
+            var status = await _employeeService.DeleteEmployeeAsync(id);
+            if (!status)
             {
                 return NotFound();
             }
-            _context.Employees.Remove(employee);
-            await _context.SaveChangesAsync();
+
             return NoContent();
         }
+        #endregion
+
     }
 }
