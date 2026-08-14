@@ -1,5 +1,6 @@
 ﻿using HRMS.API.Data;
 using HRMS.API.DTOs.Employee;
+using HRMS.API.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API.Services.Employee
@@ -19,12 +20,12 @@ namespace HRMS.API.Services.Employee
             var departmentExists = await _context.Departments.AnyAsync(d=> d.DepartmentId == employeeDto.DepartmentId);
 
             if (!departmentExists) {
-                throw new InvalidOperationException("Department not found");
+                throw new NotFoundException("Department not found");
             }
 
             if (employeeDto.JoiningDate.Date > DateTime.Today)
             {
-                throw new InvalidOperationException("Joining date cannot be in the future");
+                throw new BadRequestException("Joining date cannot be in the future");
             }
 
             var newEmployee = new Models.Employee
@@ -61,14 +62,19 @@ namespace HRMS.API.Services.Employee
         #region GetAllEmployees
         public async Task<List<Models.Employee>> GetAllEmployeesAsync()
         {
-            return await _context.Employees.ToListAsync();
+            return await _context.Employees.ToListAsync(); 
         }
         #endregion
 
         #region GetEmployeeById
         public async Task<Models.Employee?> GetEmployeeByIdAsync(int employeeId)
         {
-            return await _context.Employees.FindAsync(employeeId);
+            var employee = await _context.Employees.FindAsync(employeeId);
+            if (employee == null)
+            {
+                throw new NotFoundException("Employee not found");
+            }
+            return employee;
         }
         #endregion
 
@@ -77,16 +83,16 @@ namespace HRMS.API.Services.Employee
         {
             var existingEmployee = await _context.Employees.FindAsync(employeeId);
             if (existingEmployee == null) {
-                return null;
+                throw new NotFoundException("Employee not found");
             }
             if (employeeDto.JoiningDate.Date > DateTime.Today)
             {
-                throw new InvalidOperationException("Joining date cannot be in the future");
+                throw new BadRequestException("Joining date cannot be in the future");
             }
-            var isDepartmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
-            if (!isDepartmentExists)
+            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+            if (!departmentExists)
             {
-                throw new InvalidOperationException("Department not found");
+                throw new NotFoundException("Department not found");
             }
 
             // Update the properties of the existing employee with the new values
@@ -103,6 +109,41 @@ namespace HRMS.API.Services.Employee
             return existingEmployee;
         }
         #endregion
+
+        #region SearchEmployeesByName
+        public async Task<List<Models.Employee>> SearchEmployeesByNameAsync(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new BadRequestException("Name cannot be empty.");
+            }
+
+            var splittedName = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            var employees = await _context.Employees
+                .Where(e => splittedName.Any(n => e.FirstName.Contains(n)) || splittedName.Any(n => e.LastName.Contains(n)))
+                .ToListAsync();
+            return employees;
+        }
+
+        #endregion
+
+        #region GetEmployeesWithMinimumSalary
+        public async Task<List<Models.Employee>> GetEmployeesWithMinimumSalaryAsync(decimal minimumSalary)
+        {
+            if (minimumSalary < 0)
+            {
+                throw new BadRequestException("Minimum salary cannot be negative.");
+            }
+
+            var employees = await _context.Employees
+                .Where(e => e.Salary >= minimumSalary)
+                .ToListAsync();
+            return employees;
+        }
+        #endregion
+
+        
 
     }
 }

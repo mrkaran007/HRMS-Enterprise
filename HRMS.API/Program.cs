@@ -1,5 +1,6 @@
 
 using HRMS.API.Data;
+using HRMS.API.Middleware;
 using HRMS.API.Services.Department;
 using HRMS.API.Services.Employee;
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +41,7 @@ namespace HRMS.API
 
             app.UseAuthorization();
 
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
 
             app.MapControllers();
 

@@ -30,10 +30,7 @@ namespace HRMS.API.Controllers
         public async Task<IActionResult> GetDepartmentById(int id)
         {
             var department = await _departmentService.GetDepartmentByIdAsync(id);
-            if (department == null)
-            {
-                return NotFound();
-            }
+            
             return Ok(department);
         }
         #endregion
@@ -53,10 +50,7 @@ namespace HRMS.API.Controllers
         public async Task<IActionResult> UpdateDepartment(int id, UpdateDepartmentDto departmentDto)
         {
             var department = await _departmentService.UpdateDepartmentAsync(id, departmentDto);
-            if (department == null)
-            {
-                return NotFound();
-            }
+            
             return Ok(department);
         }
         #endregion

@@ -30,11 +30,7 @@ namespace HRMS.API.Controllers
         public async Task<IActionResult> GetEmployeeById(int id)
         {
             Employee? employee = await _employeeService.GetEmployeeByIdAsync(id);
-            
-            if (employee == null)
-            {
-                return NotFound();
-            }
+           
             return Ok(employee);
         }
         #endregion
@@ -55,11 +51,6 @@ namespace HRMS.API.Controllers
         {
             var employee = await _employeeService.UpdateEmployeeAsync(id, employeeDto);
 
-            if (employee == null)
-            {
-                return NotFound();
-            }
-
             return Ok(employee);
         }
         #endregion
@@ -75,6 +66,24 @@ namespace HRMS.API.Controllers
             }
 
             return NoContent();
+        }
+        #endregion
+
+        #region SearchEmployeesByName
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchEmployeesByNameAsync(string name)
+        {
+            var employees = await _employeeService.SearchEmployeesByNameAsync(name);
+            return Ok(employees);
+        }
+        #endregion
+
+        #region GetEmployeesWithMinimumSalary
+        [HttpGet("salary")]
+        public async Task<IActionResult> GetEmployeesWithMinimumSalaryAsync(decimal minimumSalary)
+        {
+            var employees = await _employeeService.GetEmployeesWithMinimumSalaryAsync(minimumSalary);
+            return Ok(employees);
         }
         #endregion
 

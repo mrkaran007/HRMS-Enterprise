@@ -1,5 +1,6 @@
 ﻿using HRMS.API.Data;
 using HRMS.API.DTOs.Department;
+using HRMS.API.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API.Services.Department
@@ -20,12 +21,12 @@ namespace HRMS.API.Services.Department
             var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentName == departmentName);
             if (departmentExists)
             {
-                throw new InvalidOperationException("Department already exists");
+                throw new ConflictException("Department already exists");
             }
 
             var newDepartment = new Models.Department
             {
-                DepartmentName = departmentDto.DepartmentName
+                DepartmentName = departmentName
             };
             _context.Departments.Add(newDepartment);
             await _context.SaveChangesAsync();
@@ -58,21 +59,33 @@ namespace HRMS.API.Services.Department
         #region GetDepartmentByIdAsync
         public async Task<Models.Department?> GetDepartmentByIdAsync(int departmentId)
         {
-            return await _context.Departments.FindAsync(departmentId);
+            var department = await _context.Departments.FindAsync(departmentId);
+            if (department == null)
+            {
+                throw new NotFoundException("Department not found");
+            }
+            return department;
         }
         #endregion
 
         #region UpdateDepartmentAsync
         public async Task<Models.Department?> UpdateDepartmentAsync(int departmentId, UpdateDepartmentDto departmentDto)
         {
+            var departmentName = departmentDto.DepartmentName.Trim();
+            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentName == departmentName && d.DepartmentId != departmentId);
+            if (departmentExists)
+            {
+                throw new ConflictException("Department already exists");
+            }
+
             var existingDepartment = await _context.Departments.FindAsync(departmentId);
             if (existingDepartment == null)
             {
-                return null;
+                throw new NotFoundException("Department not found");
             }
 
             // Update properties
-            existingDepartment.DepartmentName = departmentDto.DepartmentName;
+            existingDepartment.DepartmentName = departmentName;
             
             await _context.SaveChangesAsync();
 
