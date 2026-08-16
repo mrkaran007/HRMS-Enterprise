@@ -1,4 +1,5 @@
 ﻿using HRMS.API.Data;
+using HRMS.API.DTOs.Common;
 using HRMS.API.DTOs.Employee;
 using HRMS.API.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -59,10 +60,113 @@ namespace HRMS.API.Services.Employee
         }
         #endregion
 
-        #region GetAllEmployees
-        public async Task<List<Models.Employee>> GetAllEmployeesAsync()
+        #region GetEmployees
+        public async Task<PagedResultDto<EmployeeResponseDto>> GetEmployeesAsync(EmployeeSearchDto searchDto)
         {
-            return await _context.Employees.ToListAsync(); 
+            // Pagination Validation
+            if (searchDto.PageSize < 1 || searchDto.PageSize > 100)
+            {
+                throw new BadRequestException("Page size must be between 1 and 100.");
+            }
+            if (searchDto.PageNumber < 1)
+            {
+                throw new BadRequestException("Page number must be greater than 0.");
+            }
+
+            // Salary Validation
+            if (searchDto.MinimumSalary.HasValue && searchDto.MinimumSalary.Value < 0 || searchDto.MaximumSalary.HasValue && searchDto.MaximumSalary.Value < 0)
+            {
+                throw new BadRequestException("Salary values cannot be negative.");
+            }
+            
+            if (searchDto.MaximumSalary.HasValue && searchDto.MinimumSalary.HasValue 
+                && searchDto.MaximumSalary.Value < searchDto.MinimumSalary.Value)
+            {
+                throw new BadRequestException("Maximum salary must be greater than or equal to minimum salary.");
+            }
+
+            // This will improve performance for read-only queries
+            // It also prevents the context from tracking the entities, which can save memory and improve performance for read-only queries.
+            var query = _context.Employees.AsNoTracking();    // This return as IQueryable<Employee> which allows for further filtering and sorting before executing the query.
+
+            // Filtering
+            if (!string.IsNullOrWhiteSpace(searchDto.Search))
+            {
+                var searchLower = searchDto.Search.ToLower();
+                query = query.Where(e => 
+                e.FirstName.ToLower().Contains(searchLower)
+                || e.LastName.ToLower().Contains(searchLower)
+                || e.Email.ToLower().Contains(searchLower)
+                );
+            }
+
+            // Filter by DepartmentId if provided
+            if (searchDto.DepartmentId.HasValue)
+            {
+                query = query.Where(e => e.DepartmentId == searchDto.DepartmentId.Value);
+            }
+
+            // Filter by Salary range if provided
+            if (searchDto.MinimumSalary.HasValue)
+            {
+                query = query.Where(e => e.Salary >= searchDto.MinimumSalary.Value);
+            }
+
+            if(searchDto.MaximumSalary.HasValue)
+            {
+                query = query.Where(e => e.Salary <= searchDto.MaximumSalary.Value);
+            }
+
+            // Count total filtered records before pagination
+            var totalRecords = await query.CountAsync();
+
+            // Sorting
+            switch(searchDto.SortBy?.ToLower())
+            {
+                case "firstname":
+                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.FirstName) : query.OrderBy(e => e.FirstName);
+                    break;
+                case "lastname":
+                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.LastName) : query.OrderBy(e => e.LastName);
+                    break;
+                case "salary":
+                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Salary) : query.OrderBy(e => e.Salary);
+                    break;
+                case "joiningdate":
+                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.JoiningDate) : query.OrderBy(e => e.JoiningDate);
+                    break;
+                default:
+                    // Default sorting by EmployeeId
+                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.EmployeeId) : query.OrderBy(e => e.EmployeeId);
+                    break;
+            }
+
+            // Projection + Pagination
+            var employees = await query
+                .Select(e => new EmployeeResponseDto
+            {
+                EmployeeId = e.EmployeeId,
+                FullName = e.FirstName + " " + e.LastName,
+                Email = e.Email,
+                Phone = e.Phone,
+                Salary = e.Salary,
+                JoiningDate = e.JoiningDate,
+                DepartmentId = e.DepartmentId,
+                DepartmentName = e.Department!.DepartmentName
+            }).Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+            .Take(searchDto.PageSize)
+            .ToListAsync();
+
+            var totalPages = (int)Math.Ceiling((double)totalRecords / searchDto.PageSize);
+
+            return new PagedResultDto<EmployeeResponseDto>
+            {
+                Items = employees,
+                TotalPages = totalPages,
+                TotalRecords = totalRecords,
+                PageNumber = searchDto.PageNumber,
+                PageSize = searchDto.PageSize
+            };
         }
         #endregion
 
@@ -110,40 +214,8 @@ namespace HRMS.API.Services.Employee
         }
         #endregion
 
-        #region SearchEmployeesByName
-        public async Task<List<Models.Employee>> SearchEmployeesByNameAsync(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new BadRequestException("Name cannot be empty.");
-            }
 
-            var splittedName = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            var employees = await _context.Employees
-                .Where(e => splittedName.Any(n => e.FirstName.Contains(n)) || splittedName.Any(n => e.LastName.Contains(n)))
-                .ToListAsync();
-            return employees;
-        }
-
-        #endregion
-
-        #region GetEmployeesWithMinimumSalary
-        public async Task<List<Models.Employee>> GetEmployeesWithMinimumSalaryAsync(decimal minimumSalary)
-        {
-            if (minimumSalary < 0)
-            {
-                throw new BadRequestException("Minimum salary cannot be negative.");
-            }
-
-            var employees = await _context.Employees
-                .Where(e => e.Salary >= minimumSalary)
-                .ToListAsync();
-            return employees;
-        }
-        #endregion
-
-        
 
     }
 }
