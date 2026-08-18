@@ -29,7 +29,7 @@ namespace HRMS.API.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetEmployeeById(int id)
         {
-            Employee? employee = await _employeeService.GetEmployeeByIdAsync(id);
+            var employee = await _employeeService.GetEmployeeByIdAsync(id);
            
             return Ok(employee);
         }

@@ -16,7 +16,7 @@ namespace HRMS.API.Services.Employee
         }
 
         #region CreateEmployee
-        public async Task<Models.Employee> CreateEmployeeAsync(CreateEmployeeDto employeeDto)
+        public async Task<EmployeeResponseDto> CreateEmployeeAsync(CreateEmployeeDto employeeDto)
         {
             var departmentExists = await _context.Departments.AnyAsync(d=> d.DepartmentId == employeeDto.DepartmentId);
 
@@ -41,7 +41,7 @@ namespace HRMS.API.Services.Employee
             };
             _context.Employees.Add(newEmployee);
             await _context.SaveChangesAsync();
-            return newEmployee;
+            return await GetEmployeeByIdAsync(newEmployee.EmployeeId);
         }
         #endregion
 
@@ -74,7 +74,7 @@ namespace HRMS.API.Services.Employee
             }
 
             // Salary Validation
-            if (searchDto.MinimumSalary.HasValue && searchDto.MinimumSalary.Value < 0 || searchDto.MaximumSalary.HasValue && searchDto.MaximumSalary.Value < 0)
+            if ((searchDto.MinimumSalary.HasValue && searchDto.MinimumSalary.Value < 0) || (searchDto.MaximumSalary.HasValue && searchDto.MaximumSalary.Value < 0))
             {
                 throw new BadRequestException("Salary values cannot be negative.");
             }
@@ -171,29 +171,36 @@ namespace HRMS.API.Services.Employee
         #endregion
 
         #region GetEmployeeById
-        public async Task<Models.Employee?> GetEmployeeByIdAsync(int employeeId)
+        public async Task<EmployeeResponseDto> GetEmployeeByIdAsync(int employeeId)
         {
-            var employee = await _context.Employees.FindAsync(employeeId);
+            var employee = await _context.Employees
+                .Include(emp => emp.Department)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
             if (employee == null)
             {
                 throw new NotFoundException("Employee not found");
             }
-            return employee;
+            return MapToEmployeeResponseDto(employee);
         }
         #endregion
 
         #region UpdateEmployee
-        public async Task<Models.Employee?> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employeeDto)
+        public async Task<EmployeeResponseDto> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employeeDto)
         {
             var existingEmployee = await _context.Employees.FindAsync(employeeId);
+
             if (existingEmployee == null) {
                 throw new NotFoundException("Employee not found");
             }
+
             if (employeeDto.JoiningDate.Date > DateTime.Today)
             {
                 throw new BadRequestException("Joining date cannot be in the future");
             }
+
             var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+
             if (!departmentExists)
             {
                 throw new NotFoundException("Department not found");
@@ -210,11 +217,27 @@ namespace HRMS.API.Services.Employee
             
             
             await _context.SaveChangesAsync();
-            return existingEmployee;
+            return await GetEmployeeByIdAsync(employeeId);
         }
         #endregion
 
 
+        #region MapToEmployeeResponseDto
+        private static EmployeeResponseDto MapToEmployeeResponseDto(Models.Employee employee)
+        {
+            return new EmployeeResponseDto
+            {
+                EmployeeId = employee.EmployeeId,
+                FullName = employee.FirstName + " " + employee.LastName,
+                Email = employee.Email,
+                Phone = employee.Phone,
+                Salary = employee.Salary,
+                JoiningDate = employee.JoiningDate,
+                DepartmentId = employee.DepartmentId,
+                DepartmentName = employee.Department?.DepartmentName ?? "N/A" // Handle null Department case
+            };
+        }
+        #endregion
 
 
     }

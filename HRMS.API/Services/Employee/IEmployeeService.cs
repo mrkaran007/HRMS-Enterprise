@@ -7,9 +7,9 @@ namespace HRMS.API.Services.Employee
     {
         
         Task<PagedResultDto<EmployeeResponseDto>> GetEmployeesAsync(EmployeeSearchDto searchDto);
-        Task<Models.Employee?> GetEmployeeByIdAsync(int employeeId);
-        Task<Models.Employee> CreateEmployeeAsync(CreateEmployeeDto employee);
-        Task<Models.Employee?> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employee);
+        Task<EmployeeResponseDto> GetEmployeeByIdAsync(int employeeId);
+        Task<EmployeeResponseDto> CreateEmployeeAsync(CreateEmployeeDto employee);
+        Task<EmployeeResponseDto> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employee);
         Task<bool> DeleteEmployeeAsync(int employeeId);
 
     }
