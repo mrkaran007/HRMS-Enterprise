@@ -13,6 +13,7 @@
         public int DepartmentId { get; set; }
         public Department? Department { get; set; }
 
+        public ICollection<EmployeeTransferHistory> TransferHistories { get; set; } = new List<EmployeeTransferHistory>();
 
     }
 }

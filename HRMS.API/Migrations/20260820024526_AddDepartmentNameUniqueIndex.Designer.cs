@@ -4,6 +4,7 @@ using HRMS.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRMS.API.Migrations
 {
     [DbContext(typeof(HRMSDbContext))]
-    partial class HRMSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260820024526_AddDepartmentNameUniqueIndex")]
+    partial class AddDepartmentNameUniqueIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -82,37 +85,6 @@ namespace HRMS.API.Migrations
                     b.ToTable("Employees");
                 });
 
-            modelBuilder.Entity("HRMS.API.Models.EmployeeTransferHistory", b =>
-                {
-                    b.Property<int>("EmployeeTransferHistoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmployeeTransferHistoryId"));
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("FromDepartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ToDepartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("TransferDate")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("EmployeeTransferHistoryId");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.HasIndex("FromDepartmentId");
-
-                    b.HasIndex("ToDepartmentId");
-
-                    b.ToTable("EmployeeTransferHistories");
-                });
-
             modelBuilder.Entity("HRMS.API.Models.Employee", b =>
                 {
                     b.HasOne("HRMS.API.Models.Department", "Department")
@@ -124,45 +96,9 @@ namespace HRMS.API.Migrations
                     b.Navigation("Department");
                 });
 
-            modelBuilder.Entity("HRMS.API.Models.EmployeeTransferHistory", b =>
-                {
-                    b.HasOne("HRMS.API.Models.Employee", "Employee")
-                        .WithMany("TransferHistories")
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("HRMS.API.Models.Department", "FromDepartment")
-                        .WithMany("TransfersFrom")
-                        .HasForeignKey("FromDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("HRMS.API.Models.Department", "ToDepartment")
-                        .WithMany("TransfersTo")
-                        .HasForeignKey("ToDepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("FromDepartment");
-
-                    b.Navigation("ToDepartment");
-                });
-
             modelBuilder.Entity("HRMS.API.Models.Department", b =>
                 {
                     b.Navigation("Employees");
-
-                    b.Navigation("TransfersFrom");
-
-                    b.Navigation("TransfersTo");
-                });
-
-            modelBuilder.Entity("HRMS.API.Models.Employee", b =>
-                {
-                    b.Navigation("TransferHistories");
                 });
 #pragma warning restore 612, 618
         }

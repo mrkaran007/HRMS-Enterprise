@@ -3,6 +3,7 @@ using HRMS.API.DTOs.Common;
 using HRMS.API.DTOs.Employee;
 using HRMS.API.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace HRMS.API.Services.Employee
 {
@@ -221,6 +222,101 @@ namespace HRMS.API.Services.Employee
         }
         #endregion
 
+        #region TransferEmployee
+        public async Task<EmployeeTransferHistoryResponseDto> TransferEmployeeAsync(int employeeId, TransferEmployeeRequestDto transferDto)
+        {
+            var employee = await _context.Employees
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync( e => e.EmployeeId == employeeId);
+            if (employee == null)
+            {
+                throw new NotFoundException("Employee not found");
+            }
+
+            var targetDepartment = await _context.Departments
+                .FirstOrDefaultAsync( d => d.DepartmentId == transferDto.TargetDepartmentId);
+            if(targetDepartment == null)
+            {
+                throw new NotFoundException("Target department not found");
+            }
+
+            if (employee.DepartmentId == transferDto.TargetDepartmentId)
+            {
+                throw new BadRequestException("Employee is already assigned to this department.");
+            }
+
+            var fromDepartmentId = employee.DepartmentId;
+            var fromDepartmentName = employee.Department!.DepartmentName;
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var transferHistory = new Models.EmployeeTransferHistory
+                {
+                    EmployeeId = employeeId,
+                    FromDepartmentId = fromDepartmentId,
+                    ToDepartmentId = transferDto.TargetDepartmentId,
+                    TransferDate = DateTime.UtcNow
+                };
+
+                _context.EmployeeTransferHistories.Add(transferHistory);
+
+                employee.DepartmentId = transferDto.TargetDepartmentId;
+
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return new EmployeeTransferHistoryResponseDto
+                {
+                    EmployeeTransferHistoryId = transferHistory.EmployeeTransferHistoryId,
+                    EmployeeId = employeeId,
+                    EmployeeName = employee.FirstName + " " + employee.LastName,
+                    FromDepartmentId = fromDepartmentId,
+                    FromDepartmentName = fromDepartmentName,
+                    ToDepartmentId = targetDepartment.DepartmentId,
+                    ToDepartmentName = targetDepartment.DepartmentName,
+                    TransferDate = transferHistory.TransferDate,
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
+        }
+        #endregion
+
+        #region GetEmployeeTransferHistory
+        public async Task<List<EmployeeTransferHistoryResponseDto>> GetEmployeeTransferHistoryAsync(int employeeId)
+        {
+            var employeeExists = await _context.Employees.AnyAsync(e=> e.EmployeeId == employeeId);
+            if (!employeeExists)
+            {
+                throw new NotFoundException("Employee not found");
+            }
+
+            var employeeTransferHistories = await _context.EmployeeTransferHistories
+                .AsNoTracking()
+                .Where(th => th.EmployeeId == employeeId)
+                .OrderByDescending(th => th.TransferDate)
+                .Select(th => new EmployeeTransferHistoryResponseDto
+                {
+                    EmployeeTransferHistoryId = th.EmployeeTransferHistoryId,
+                    EmployeeId = th.EmployeeId,
+                    EmployeeName = th.Employee.FirstName + " " + th.Employee.LastName,
+                    FromDepartmentId = th.FromDepartmentId,
+                    FromDepartmentName = th.FromDepartment.DepartmentName,
+                    ToDepartmentId = th.ToDepartmentId,
+                    ToDepartmentName= th.ToDepartment.DepartmentName,
+                    TransferDate = th.TransferDate
+                })
+                .ToListAsync();
+            return employeeTransferHistories;
+        }
+        #endregion
 
         #region MapToEmployeeResponseDto
         private static EmployeeResponseDto MapToEmployeeResponseDto(Models.Employee employee)

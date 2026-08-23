@@ -43,6 +43,12 @@ namespace HRMS.API.Services.Department
                 return false;
             }
 
+            var hasEmployees = await _context.Employees.AnyAsync(e => e.DepartmentId == departmentId);
+            if (hasEmployees)
+            {
+                throw new ConflictException("Department cannot be deleted because employees are assigned to it.");
+            }
+
             _context.Departments.Remove(existingDepartment);
             await _context.SaveChangesAsync();
             return true;
@@ -52,7 +58,9 @@ namespace HRMS.API.Services.Department
         #region GetAllDepartmentsAsync
         public async Task<List<Models.Department>> GetAllDepartmentsAsync()
         {
-            return await _context.Departments.ToListAsync();
+            return await _context.Departments
+                .AsNoTracking()
+                .ToListAsync();
         }
         #endregion
 

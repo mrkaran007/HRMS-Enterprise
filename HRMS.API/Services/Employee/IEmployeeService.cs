@@ -12,5 +12,8 @@ namespace HRMS.API.Services.Employee
         Task<EmployeeResponseDto> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employee);
         Task<bool> DeleteEmployeeAsync(int employeeId);
 
+        Task<EmployeeTransferHistoryResponseDto> TransferEmployeeAsync(int employeeId, TransferEmployeeRequestDto transferDto);
+        Task<List<EmployeeTransferHistoryResponseDto>> GetEmployeeTransferHistoryAsync(int  employeeId);
+
     }
 }

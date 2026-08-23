@@ -69,7 +69,23 @@ namespace HRMS.API.Controllers
         }
         #endregion
 
+        #region TransferEmployee
+        [HttpPut("{id}/transfer")]
+        public async Task<IActionResult> TransferEmployee(int id, TransferEmployeeRequestDto transferDto)
+        {
+            var result = await _employeeService.TransferEmployeeAsync(id, transferDto);
+            return Ok(result);
+        }
+        #endregion
 
+        #region GetEmployeeTransferHistory
+        [HttpGet("{id}/transfer-history")]
+        public async Task<IActionResult> GetEmployeeTransferHistory(int id)
+        {
+            var history = await _employeeService.GetEmployeeTransferHistoryAsync(id);
+            return Ok(history);
+        }
+        #endregion
 
     }
 }
