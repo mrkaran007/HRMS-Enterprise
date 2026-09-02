@@ -1,9 +1,11 @@
 ﻿using HRMS.API.DTOs.Department;
 using HRMS.API.Services.Department;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HRMS.API.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class DepartmentController : ControllerBase
@@ -36,6 +38,7 @@ namespace HRMS.API.Controllers
         #endregion
 
         #region CreateDepartment
+        [Authorize(Roles = "admin,hr")]
         [HttpPost]
         public async Task<IActionResult> CreateDepartment(CreateDepartmentDto departmentDto)
         {
@@ -46,6 +49,7 @@ namespace HRMS.API.Controllers
         #endregion
 
         #region UpdateDepartment
+        [Authorize(Roles = "admin,hr")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateDepartment(int id, UpdateDepartmentDto departmentDto)
         {
@@ -56,6 +60,7 @@ namespace HRMS.API.Controllers
         #endregion
 
         #region DeleteDepartment
+        [Authorize(Roles = "admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDepartment(int id)
         {

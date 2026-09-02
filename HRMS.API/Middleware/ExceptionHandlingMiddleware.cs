@@ -49,6 +49,10 @@ namespace HRMS.API.Middleware
                     statusCode = StatusCodes.Status409Conflict;
                     message = ex.Message;
                     break;
+                case UnauthorizedException:
+                    statusCode = StatusCodes.Status401Unauthorized;
+                    message = ex.Message;
+                    break;
                 default:
                     //statusCode = (int)HttpStatusCode.InternalServerError;
                     statusCode = StatusCodes.Status500InternalServerError;

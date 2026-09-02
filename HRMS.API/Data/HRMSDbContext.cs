@@ -12,6 +12,7 @@ namespace HRMS.API.Data
         public DbSet<Department> Departments { get; set; }
         public DbSet<Employee> Employees { get; set; }
         public DbSet<EmployeeTransferHistory> EmployeeTransferHistories { get; set; }
+        public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,6 +50,20 @@ namespace HRMS.API.Data
                 .WithMany(d => d.TransfersTo)
                 .HasForeignKey(th => th.ToDepartmentId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // User -> Employee
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Employee)
+                .WithOne()
+                .HasForeignKey<User>(u => u.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One Employee should not have multiple login account
+            // Constraint EmployeeId be Unique in User table
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.EmployeeId)
+                .IsUnique()
+                .HasFilter("[EmployeeId] IS NOT NULL");
         }
     }
 }
