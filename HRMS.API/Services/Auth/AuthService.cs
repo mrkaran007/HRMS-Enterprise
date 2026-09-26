@@ -1,21 +1,31 @@
-﻿using HRMS.API.Data;
-using HRMS.API.DTOs.Auth;
+﻿using HRMS.API.DTOs.Auth;
 using HRMS.API.Exceptions;
 using HRMS.API.Models;
+using HRMS.API.Repositories;
+using HRMS.API.Repositories.Employee;
+using HRMS.API.Repositories.User;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.API.Services.Auth
 {
     public class AuthService : IAuthService
     {
-        private readonly HRMSDbContext _context;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IJwtService _jwtService;
+        private readonly IUserRepository _userRepository;
+        private readonly IEmployeeRepository _employeeRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AuthService(HRMSDbContext context, IPasswordHasher<User> passwordHasher, IJwtService jwtService)
+        public AuthService(
+            IUserRepository userRepository,
+            IEmployeeRepository employeeRepository,
+            IUnitOfWork unitOfWork,
+            IPasswordHasher<User> passwordHasher,
+            IJwtService jwtService)
         {
-            _context = context;
+            _userRepository = userRepository;
+            _employeeRepository = employeeRepository;
+            _unitOfWork = unitOfWork;
             _passwordHasher = passwordHasher;
             _jwtService = jwtService;
         }
@@ -24,14 +34,14 @@ namespace HRMS.API.Services.Auth
         public async Task CreateUserAsync(CreateUserDto createUserDto)
         {
             var userName = createUserDto.UserName.Trim();
-            var userNameExists = await _context.Users.AnyAsync(u => u.UserName == userName);
+            var userNameExists = await _userRepository.UserNameExistsAsync(userName);
             if (userNameExists)
             {
                 throw new ConflictException("Username already exists.");
             }
 
             var email = createUserDto.Email.ToLower().Trim();
-            var emailExists = await _context.Users.AnyAsync(u => u.Email == email);
+            var emailExists = await _userRepository.EmailExistsAsync(email);
             if (emailExists)
             {
                 throw new ConflictException("Email already exists.");
@@ -58,16 +68,14 @@ namespace HRMS.API.Services.Auth
 
             if (createUserDto.EmployeeId.HasValue)
             {
-                var employeeExists = await _context.Employees
-                    .AnyAsync(e => e.EmployeeId == createUserDto.EmployeeId.Value);
+                var employeeExists = await _employeeRepository.ExistsAsync(createUserDto.EmployeeId.Value);
 
                 if (!employeeExists)
                 {
                     throw new NotFoundException("Employee not found.");
                 }
 
-                var employeeAlreadyHasUserAccount = await _context.Users
-                    .AnyAsync(u => u.EmployeeId == createUserDto.EmployeeId.Value);
+                var employeeAlreadyHasUserAccount = await _userRepository.EmployeeHasUserAccountAsync(createUserDto.EmployeeId.Value);
 
                 if (employeeAlreadyHasUserAccount)
                 {
@@ -87,8 +95,8 @@ namespace HRMS.API.Services.Auth
 
             user.PasswordHash = _passwordHasher.HashPassword(user, createUserDto.Password);
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            _userRepository.Add(user);
+            await _unitOfWork.SaveChangesAsync();
 
         }
         #endregion
@@ -96,7 +104,7 @@ namespace HRMS.API.Services.Auth
         #region LoginAsync
         public async Task<LoginResponseDto> LoginAsync(LoginRequestDto loginRequestDto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == loginRequestDto.UserName.Trim() );
+            var user = await _userRepository.GetByUserNameAsync(loginRequestDto.UserName.Trim());
             if (user == null)
             {
                 throw new UnauthorizedException("Invalid username or password.");

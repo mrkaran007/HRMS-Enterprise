@@ -20,8 +20,7 @@ namespace HRMS.API.Authorization
                 return Task.CompletedTask;
             }
 
-            // Employee-specific checking will be handled here
-            // once we provide the requested Employee resource.
+            // Employees can access only their own employee resource.
             if (!int.TryParse(employeeIdClaim, out var currentEmployeeId))
             {
                 return Task.CompletedTask;

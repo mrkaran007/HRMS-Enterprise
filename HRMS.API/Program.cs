@@ -1,18 +1,23 @@
 
+using HRMS.API.Authorization;
 using HRMS.API.Data;
 using HRMS.API.Middleware;
 using HRMS.API.Models;
+using HRMS.API.Repositories;
+using HRMS.API.Repositories.Department;
+using HRMS.API.Repositories.Employee;
+using HRMS.API.Repositories.TransferHistory;
+using HRMS.API.Repositories.User;
 using HRMS.API.Services.Auth;
 using HRMS.API.Services.Department;
 using HRMS.API.Services.Employee;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using Microsoft.OpenApi.Models;
-using HRMS.API.Authorization;
-using Microsoft.AspNetCore.Authorization;
+using System.Text;
 
 namespace HRMS.API
 {
@@ -53,6 +58,13 @@ namespace HRMS.API
                 });
             });
             builder.Services.AddControllers();
+
+            builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+            builder.Services.AddScoped<ITransferHistoryRepository, TransferHistoryRepository>();
+            builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddScoped<IUserRepository, UserRepository>();
+
 
             builder.Services.AddScoped<IEmployeeService, EmployeeService>();
             builder.Services.AddScoped<IDepartmentService, DepartmentService>();

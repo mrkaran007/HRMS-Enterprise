@@ -2,24 +2,37 @@
 using HRMS.API.DTOs.Common;
 using HRMS.API.DTOs.Employee;
 using HRMS.API.Exceptions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using HRMS.API.Repositories;
+using HRMS.API.Repositories.Department;
+using HRMS.API.Repositories.Employee;
+using HRMS.API.Repositories.TransferHistory;
 
 namespace HRMS.API.Services.Employee
 {
     public class EmployeeService : IEmployeeService
     {
         private readonly HRMSDbContext _context;
+        private readonly IEmployeeRepository _employeeRepository;
+        private readonly ITransferHistoryRepository _transferHistoryRepository;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IDepartmentRepository _departmentRepository;
 
-        public EmployeeService(HRMSDbContext context)
+        public EmployeeService(HRMSDbContext context,
+            IEmployeeRepository employeeRepository,
+            ITransferHistoryRepository transferHistoryRepository,
+            IUnitOfWork unitOfWork, IDepartmentRepository departmentRepository)
         {
             _context = context;
+            _employeeRepository = employeeRepository;
+            _transferHistoryRepository = transferHistoryRepository;
+            _unitOfWork = unitOfWork;
+            _departmentRepository = departmentRepository;
         }
 
         #region CreateEmployee
         public async Task<EmployeeResponseDto> CreateEmployeeAsync(CreateEmployeeDto employeeDto)
         {
-            var departmentExists = await _context.Departments.AnyAsync(d=> d.DepartmentId == employeeDto.DepartmentId);
+            var departmentExists = await _departmentRepository.ExistsAsync(employeeDto.DepartmentId);
 
             if (!departmentExists) {
                 throw new NotFoundException("Department not found");
@@ -40,8 +53,9 @@ namespace HRMS.API.Services.Employee
                 JoiningDate = employeeDto.JoiningDate,
                 DepartmentId = employeeDto.DepartmentId
             };
-            _context.Employees.Add(newEmployee);
-            await _context.SaveChangesAsync();
+
+            await _employeeRepository.AddAsync(newEmployee);
+            await _unitOfWork.SaveChangesAsync();
             return await GetEmployeeByIdAsync(newEmployee.EmployeeId);
         }
         #endregion
@@ -49,14 +63,14 @@ namespace HRMS.API.Services.Employee
         #region DeleteEmployee
         public async Task<bool> DeleteEmployeeAsync(int employeeId)
         {
-            var existingEmployee = await _context.Employees.FindAsync(employeeId);
-            if (existingEmployee == null)
+            var employee = await _employeeRepository.GetByIdAsync(employeeId);
+            if (employee == null)
             {
                 return false;
             }
 
-            _context.Employees.Remove(existingEmployee);
-            await _context.SaveChangesAsync();
+            _employeeRepository.Delete(employee);
+            await _unitOfWork.SaveChangesAsync();
             return true;
         }
         #endregion
@@ -64,6 +78,8 @@ namespace HRMS.API.Services.Employee
         #region GetEmployees
         public async Task<PagedResultDto<EmployeeResponseDto>> GetEmployeesAsync(EmployeeSearchDto searchDto)
         {
+            // Business/API validation
+
             // Pagination Validation
             if (searchDto.PageSize < 1 || searchDto.PageSize > 100)
             {
@@ -86,83 +102,39 @@ namespace HRMS.API.Services.Employee
                 throw new BadRequestException("Maximum salary must be greater than or equal to minimum salary.");
             }
 
-            // This will improve performance for read-only queries
-            // It also prevents the context from tracking the entities, which can save memory and improve performance for read-only queries.
-            var query = _context.Employees.AsNoTracking();    // This return as IQueryable<Employee> which allows for further filtering and sorting before executing the query.
-
-            // Filtering
-            if (!string.IsNullOrWhiteSpace(searchDto.Search))
-            {
-                var searchLower = searchDto.Search.ToLower();
-                query = query.Where(e => 
-                e.FirstName.ToLower().Contains(searchLower)
-                || e.LastName.ToLower().Contains(searchLower)
-                || e.Email.ToLower().Contains(searchLower)
-                );
-            }
-
-            // Filter by DepartmentId if provided
-            if (searchDto.DepartmentId.HasValue)
-            {
-                query = query.Where(e => e.DepartmentId == searchDto.DepartmentId.Value);
-            }
-
-            // Filter by Salary range if provided
-            if (searchDto.MinimumSalary.HasValue)
-            {
-                query = query.Where(e => e.Salary >= searchDto.MinimumSalary.Value);
-            }
-
-            if(searchDto.MaximumSalary.HasValue)
-            {
-                query = query.Where(e => e.Salary <= searchDto.MaximumSalary.Value);
-            }
 
             // Count total filtered records before pagination
-            var totalRecords = await query.CountAsync();
+            // Get total matching records
+            var totalRecords = await _employeeRepository.CountAsync(
+                searchDto.Search,
+                searchDto.DepartmentId,
+                searchDto.MinimumSalary,
+                searchDto.MaximumSalary);
 
-            // Sorting
-            switch(searchDto.SortBy?.ToLower())
-            {
-                case "firstname":
-                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.FirstName) : query.OrderBy(e => e.FirstName);
-                    break;
-                case "lastname":
-                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.LastName) : query.OrderBy(e => e.LastName);
-                    break;
-                case "salary":
-                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Salary) : query.OrderBy(e => e.Salary);
-                    break;
-                case "joiningdate":
-                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.JoiningDate) : query.OrderBy(e => e.JoiningDate);
-                    break;
-                default:
-                    // Default sorting by EmployeeId
-                    query = searchDto.SortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.EmployeeId) : query.OrderBy(e => e.EmployeeId);
-                    break;
-            }
+
 
             // Projection + Pagination
-            var employees = await query
-                .Select(e => new EmployeeResponseDto
-            {
-                EmployeeId = e.EmployeeId,
-                FullName = e.FirstName + " " + e.LastName,
-                Email = e.Email,
-                Phone = e.Phone,
-                Salary = e.Salary,
-                JoiningDate = e.JoiningDate,
-                DepartmentId = e.DepartmentId,
-                DepartmentName = e.Department!.DepartmentName
-            }).Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-            .Take(searchDto.PageSize)
-            .ToListAsync();
+            // Get requested page
+            var employees = await _employeeRepository.SearchAsync(
+                searchDto.Search,
+                searchDto.DepartmentId,
+                searchDto.MinimumSalary,
+                searchDto.MaximumSalary,
+                searchDto.SortBy,
+                searchDto.SortOrder,
+                searchDto.PageNumber,
+                searchDto.PageSize);
+
+            // Convert Entity -> Response DTO
+            var employeeDtos = employees
+                .Select(MapToEmployeeResponseDto)
+                .ToList();
 
             var totalPages = (int)Math.Ceiling((double)totalRecords / searchDto.PageSize);
 
             return new PagedResultDto<EmployeeResponseDto>
             {
-                Items = employees,
+                Items = employeeDtos,
                 TotalPages = totalPages,
                 TotalRecords = totalRecords,
                 PageNumber = searchDto.PageNumber,
@@ -174,10 +146,7 @@ namespace HRMS.API.Services.Employee
         #region GetEmployeeById
         public async Task<EmployeeResponseDto> GetEmployeeByIdAsync(int employeeId)
         {
-            var employee = await _context.Employees
-                .Include(emp => emp.Department)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
+            var employee = await _employeeRepository.GetByIdAsync(employeeId);
             if (employee == null)
             {
                 throw new NotFoundException("Employee not found");
@@ -189,9 +158,9 @@ namespace HRMS.API.Services.Employee
         #region UpdateEmployee
         public async Task<EmployeeResponseDto> UpdateEmployeeAsync(int employeeId, UpdateEmployeeDto employeeDto)
         {
-            var existingEmployee = await _context.Employees.FindAsync(employeeId);
+            var employee = await _employeeRepository.GetForUpdateAsync(employeeId);
 
-            if (existingEmployee == null) {
+            if (employee == null) {
                 throw new NotFoundException("Employee not found");
             }
 
@@ -200,7 +169,7 @@ namespace HRMS.API.Services.Employee
                 throw new BadRequestException("Joining date cannot be in the future");
             }
 
-            var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == employeeDto.DepartmentId);
+            var departmentExists = await _departmentRepository.ExistsAsync(employeeDto.DepartmentId);
 
             if (!departmentExists)
             {
@@ -208,16 +177,16 @@ namespace HRMS.API.Services.Employee
             }
 
             // Update the properties of the existing employee with the new values
-            existingEmployee.FirstName = employeeDto.FirstName;
-            existingEmployee.LastName = employeeDto.LastName;
-            existingEmployee.Email = employeeDto.Email;
-            existingEmployee.Phone = employeeDto.Phone;
-            existingEmployee.Salary = employeeDto.Salary;
-            existingEmployee.JoiningDate = employeeDto.JoiningDate;
-            existingEmployee.DepartmentId = employeeDto.DepartmentId;
+            employee.FirstName = employeeDto.FirstName;
+            employee.LastName = employeeDto.LastName;
+            employee.Email = employeeDto.Email;
+            employee.Phone = employeeDto.Phone;
+            employee.Salary = employeeDto.Salary;
+            employee.JoiningDate = employeeDto.JoiningDate;
+            employee.DepartmentId = employeeDto.DepartmentId;
             
-            
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
+
             return await GetEmployeeByIdAsync(employeeId);
         }
         #endregion
@@ -225,16 +194,13 @@ namespace HRMS.API.Services.Employee
         #region TransferEmployee
         public async Task<EmployeeTransferHistoryResponseDto> TransferEmployeeAsync(int employeeId, TransferEmployeeRequestDto transferDto)
         {
-            var employee = await _context.Employees
-                .Include(e => e.Department)
-                .FirstOrDefaultAsync( e => e.EmployeeId == employeeId);
+            var employee = await _employeeRepository.GetByIdAsync(employeeId);
             if (employee == null)
             {
                 throw new NotFoundException("Employee not found");
             }
 
-            var targetDepartment = await _context.Departments
-                .FirstOrDefaultAsync( d => d.DepartmentId == transferDto.TargetDepartmentId);
+            var targetDepartment = await _departmentRepository.GetByIdAsync(transferDto.TargetDepartmentId);
             if(targetDepartment == null)
             {
                 throw new NotFoundException("Target department not found");
@@ -260,11 +226,13 @@ namespace HRMS.API.Services.Employee
                     TransferDate = DateTime.UtcNow
                 };
 
-                _context.EmployeeTransferHistories.Add(transferHistory);
+                await _transferHistoryRepository.AddAsync(transferHistory);
 
                 employee.DepartmentId = transferDto.TargetDepartmentId;
 
-                await _context.SaveChangesAsync();
+                _employeeRepository.Update(employee);
+
+                await _unitOfWork.SaveChangesAsync();
 
                 await transaction.CommitAsync();
 
@@ -292,29 +260,12 @@ namespace HRMS.API.Services.Employee
         #region GetEmployeeTransferHistory
         public async Task<List<EmployeeTransferHistoryResponseDto>> GetEmployeeTransferHistoryAsync(int employeeId)
         {
-            var employeeExists = await _context.Employees.AnyAsync(e=> e.EmployeeId == employeeId);
+            var employeeExists = await _employeeRepository.ExistsAsync(employeeId);
             if (!employeeExists)
             {
                 throw new NotFoundException("Employee not found");
             }
-
-            var employeeTransferHistories = await _context.EmployeeTransferHistories
-                .AsNoTracking()
-                .Where(th => th.EmployeeId == employeeId)
-                .OrderByDescending(th => th.TransferDate)
-                .Select(th => new EmployeeTransferHistoryResponseDto
-                {
-                    EmployeeTransferHistoryId = th.EmployeeTransferHistoryId,
-                    EmployeeId = th.EmployeeId,
-                    EmployeeName = th.Employee.FirstName + " " + th.Employee.LastName,
-                    FromDepartmentId = th.FromDepartmentId,
-                    FromDepartmentName = th.FromDepartment.DepartmentName,
-                    ToDepartmentId = th.ToDepartmentId,
-                    ToDepartmentName= th.ToDepartment.DepartmentName,
-                    TransferDate = th.TransferDate
-                })
-                .ToListAsync();
-            return employeeTransferHistories;
+            return await _transferHistoryRepository.GetByEmployeeIdAsync(employeeId);
         }
         #endregion
 
