@@ -156,3 +156,7 @@ The repository's `appsettings.json` contains a clearly named development placeho
 
 This repository currently contains the backend API described above. No frontend application or deployment configuration is included in the checked-in solution.
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE.txt](LICENSE.txt) for the full license text.
+
